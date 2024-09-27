@@ -15,3 +15,4 @@ I ask you to implement an importer/exporter for XES file and a data structure th
 The activity in the XES notation is stored in the attribute having key "concept:name" and is of type string.
 
 Implement that in the ANSI C language without dependencies in an efficient way.
+Make the program accept an input argument (the input file) and an output argument (the output file)
