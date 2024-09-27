@@ -1,4 +1,4 @@
 # k
-Experimental Polimorphic Process Mining Platform
+Experimental Polymorphic Process Mining Platform
 
 ![Baby K](infant_k.png)
