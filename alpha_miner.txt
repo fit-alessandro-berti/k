@@ -1,0 +1,70 @@
+You are asked to implement the Alpha Miner process discovery algorithm.
+You should accept two arguments, the first is the input XES event log file, the second is the resulting PNML (accepting Petri net).
+
+Please provide an implementation in ANSI C without additional dependencies.
+
+You already have all the methods to import/export XES and PNML!! I provided the signatures that you can use for process discovery. please only the alpha algorithm.
+
+Make sure to identify the maximal sets!
+
+<<signature for XES>>
+
+ * **Main Components:**
+
+- **Data Structures:**
+  - `Case`: Represents a single case (trace) containing a list of activities.
+  - `Log`: Represents the entire log containing multiple cases.
+
+- **Functions:**
+  - `create_log()`: Allocates and initializes a new log.
+  - `free_log(Log *log)`: Frees all memory associated with the log.
+  - `add_activity_to_case(Case *c, const char *activity)`: Adds an activity to a case.
+  - `add_case(Log *log)`: Adds a new case to the log.
+  - `parse_xes(FILE *fp, Log *log)`: Parses an XES file and fills the log data structure.
+  - `export_xes(FILE *fp, Log *log)`: Exports the log data structure back into an XES file.
+  
+
+<<signature for PNML>>
+
+signature of Petri net methods:
+
+PetriNet* createPetriNet();
+void addPlace(PetriNet* net, char* id, int initialMarking);
+void addTransition(PetriNet* net, char* id, char* name, int visible);
+void addArc(PetriNet* net, char* id, char* source, char* target);
+void addFinalMarking(PetriNet* net, char* place_id, int finalMarking);
+
+void exportPNML(PetriNet* net, const char* filename);
+void freePetriNet(PetriNet* net);
+
+<<Alpha Miner description>>
+
+For example, having an event log:
+
+<math>L1 = [<A,B,C,D>, <A,C,B,D>, <A,E,D>]</math>
+
+Every event log can be boiled down into a multi-set of traces, and such traces can be further used to break down relationships between various activities in the process. According to the rules of alpha miner, activities belonging to various cases can have 4 types of relationships between them:<ref name=":02"/>
+
+* '''Direct Succession: x > y''' if and only if some relation x is directly following by y. In our example, we can consider that '''A > B''', '''A > E''', '''A > C.'''
+* '''Causality: x → y''' iff x > y and not y > x. In our example, we can consider that '''A → E.'''
+* '''Parallel: x || y''' iff x > y and y > x. In our example, we have '''B || C.'''
+* '''Choice: x # y''' iff not(x > y) and not(y > x). In our example, we have '''A # D.'''
+
+The alpha miner starts with converting an event log into directly-follows, sequence, parallel, and choice relations, and using them to create a petri net describing the process model. Initially the algorithm constructs a footprint matrix. Using the footprint matrix and the above shown pattern, one can construct a process model.
+Based on the four relations described earlier a footprint based matrix is first discovered. Using the footprint based matrix places are discovered. Each place is identified with a pair of ''sets of'' tasks, in order to keep the number of places low.
+
+* <math>Y_W</math> is the set of all pairs <math>(A,B)</math> of maximal sets of tasks such that
+** Neither <math>A \times A</math> and <math>B \times B</math> contain any members of '''>''' and
+** <math>A \times B</math> is a subset of '''→'''
+* <math>P_W</math> contains one place <math>p_{(A,B)}</math> for every member of <math>Y_W</math>, plus the input place <math>i_W</math> and the output place <math>o_W</math>
+
+The flow relation <math>F_W</math> is the union of the following:
+* <math>\{(a,p_{(A,B)}) | (A,B) \in Y_W \wedge a \in A\}</math>
+* <math>\{(p_{(A,B)},b) | (A,B) \in Y_W \wedge b \in B\}</math>
+* <math>\{(i_W,t) | t\in T_I\}</math>
+* <math>\{(t,i_O) | t\in T_O\}</math>
+
+The result is
+* a [[Petri net]] structure <math>\alpha(W) = (P_W,T_W,F_W)</math>
+* with one input place <math>i_W</math> and one output place <math>o_W</math>
+* because every transition of <math>T_W</math> is on a <math>F_W</math>-path from <math>i_W</math> to <math>o_W</math>, it is indeed a workflow net.
