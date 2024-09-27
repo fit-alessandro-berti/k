@@ -1,11 +1,3 @@
-# signature of XESImporterExporter (implemented in rb_xes.rb)
-#
-# constructor: XESImporterExporter.new
-#
-# methods:
-# * importer_exporter.import(input_file)
-# * importer_exporter.export(output_file)
-
 class XESImporterExporter
   attr_accessor :traces
 
