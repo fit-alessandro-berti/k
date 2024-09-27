@@ -2,6 +2,19 @@
 #include <stdlib.h>
 #include <string.h>
 
+/*
+signature of Petri net methods:
+
+PetriNet* createPetriNet();
+void addPlace(PetriNet* net, char* id, int initialMarking);
+void addTransition(PetriNet* net, char* id, char* name, int visible);
+void addArc(PetriNet* net, char* id, char* source, char* target);
+void addFinalMarking(PetriNet* net, char* place_id, int finalMarking);
+
+void exportPNML(PetriNet* net, const char* filename);
+void freePetriNet(PetriNet* net);
+*/
+
 // Structure for a Place
 typedef struct Place {
     char id[50];
