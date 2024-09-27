@@ -1,5 +1,6 @@
 I ask you to implement importers/exporters for the Object-Centric Event Log (OCEL) 2.0 standard in process mining.
-Implement that in a single file in the ANSI C language without dependencies in an efficient way.
+Implement that in a single file in the Ruby scripting language without dependencies in an efficient way.
+Make the program accept an input argument (the input file) and an output argument (the output file)
 
 There are two variants, here we focus on the JSON one.
 
