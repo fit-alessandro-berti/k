@@ -1,0 +1,17 @@
+A XES file is an XML standard for the storage of event logs.
+The tag establishes the encoding of the file and the version of the standard.
+For example, we are XES 1.0 and use the UTF-8 encoding resulting in a first row like:
+<?xml version='1.0' encoding='UTF-8'?>
+The contents of the log are contained in the <log> tag.
+You can see a log as a collection of properties and cases.
+Ignore the properties and focus on the cases.
+Each case is contained in the <trace> tag.
+Each case may contain several attributes (for the case) and events. Each event is contained in the <event> tag.
+For each attribute, its type is the name of the corresponding XML tag.
+The name of the attribute is stored inside the "key" property and the corresponding value inside "value".
+You can consider that these types of attributes exist: string, date, int, float, boolean
+
+I ask you to implement an importer/exporter for XES file and a data structure that only stores the activity of each event and no other attribute at the case and event level.
+The activity in the XES notation is stored in the attribute having key "concept:name" and is of type string.
+
+Implement that in the ANSI C language without dependencies in an efficient way.
