@@ -1,7 +1,7 @@
 You are asked to implement the Alpha Miner process discovery algorithm.
 You should accept two arguments, the first is the input XES event log file, the second is the resulting PNML (accepting Petri net).
 
-Please provide an implementation in ANSI C without additional dependencies.
+Please provide an implementation in the Ruby scripting language. An old version, not supporting array destructuring in block parameters.
 
 You already have all the methods to import/export XES and PNML!! I provided the signatures that you can use for process discovery. please only the alpha algorithm.
 
@@ -9,33 +9,109 @@ Make sure to identify the maximal sets!
 
 <<signature for XES>>
 
- * **Main Components:**
+class XESImporterExporter
+  attr_accessor :traces
 
-- **Data Structures:**
-  - `Case`: Represents a single case (trace) containing a list of activities.
-  - `Log`: Represents the entire log containing multiple cases.
+  def initialize
+    @traces = []
+  end
 
-- **Functions:**
-  - `create_log()`: Allocates and initializes a new log.
-  - `free_log(Log *log)`: Frees all memory associated with the log.
-  - `add_activity_to_case(Case *c, const char *activity)`: Adds an activity to a case.
-  - `add_case(Log *log)`: Adds a new case to the log.
-  - `parse_xes(FILE *fp, Log *log)`: Parses an XES file and fills the log data structure.
-  - `export_xes(FILE *fp, Log *log)`: Exports the log data structure back into an XES file.
+  # Import XES file and populate @traces
+  def import(file_path)
+    current_trace = nil
+    inside_event = false
+
+    File.open(file_path, 'r') do |file|
+      file.each_line do |line|
+        line.strip!
+
+        if line.start_with?('<trace>')
+          current_trace = []
+        elsif line.start_with?('</trace>')
+          @traces << current_trace if current_trace
+          current_trace = nil
+        elsif line.start_with?('<event>')
+          inside_event = true
+        elsif line.start_with?('</event>')
+          inside_event = false
+        elsif inside_event && line.start_with?('<string ')
+          # Extract key and value
+          key = extract_attribute(line, 'key')
+          value = extract_attribute(line, 'value')
+          if key == 'concept:name'
+            current_trace << value if current_trace
+          end
+        end
+      end
+    end
+  end
   
 
 <<signature for PNML>>
 
-signature of Petri net methods:
+# signatures in rb_pnml.rb
+#
 
-PetriNet* createPetriNet();
-void addPlace(PetriNet* net, char* id, int initialMarking);
-void addTransition(PetriNet* net, char* id, char* name, int visible);
-void addArc(PetriNet* net, char* id, char* source, char* target);
-void addFinalMarking(PetriNet* net, char* place_id, int finalMarking);
+# Define the Place class
+class Place
+  attr_accessor :id, :name, :initial_marking
 
-void exportPNML(PetriNet* net, const char* filename);
-void freePetriNet(PetriNet* net);
+  def initialize(id, name)
+    @id = id
+    @name = name
+    @initial_marking = nil
+  end
+end
+
+# Define the Transition class
+class Transition
+  attr_accessor :id, :name, :visible, :local_node_id
+
+  def initialize(id, name)
+    @id = id
+    @name = name
+    @visible = true # Transitions are visible by default
+    @local_node_id = ''
+  end
+end
+
+# Define the Arc class
+class Arc
+  attr_accessor :id, :source_id, :target_id
+
+  def initialize(id, source_id, target_id)
+    @id = id
+    @source_id = source_id
+    @target_id = target_id
+  end
+end
+
+# Define the PetriNet class
+class PetriNet
+  attr_accessor :places, :transitions, :arcs, :initial_markings, :final_markings
+
+  def initialize
+    @places = {}
+    @transitions = {}
+    @arcs = []
+    @initial_markings = {}
+    @final_markings = {}
+  end
+
+  def add_place(place)
+    @places[place.id] = place
+  end
+
+  def add_transition(transition)
+    @transitions[transition.id] = transition
+  end
+
+  def add_arc(arc)
+    @arcs << arc
+  end
+end
+
+
 
 <<Alpha Miner description>>
 
