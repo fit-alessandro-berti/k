@@ -171,3 +171,5 @@ cython_debug/
 */*.xes
 *.pnml
 */*.pnml
+*.ptml
+*/*.ptml
