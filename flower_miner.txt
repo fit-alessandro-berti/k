@@ -1,0 +1,278 @@
+Please implement the flower miner. The result is a process tree doing a loop (tag "xorLoop") between:
+- (DO) A choice between all the activities of the event log
+- (REDO) An invisible transition.
+
+Please produce a script in the Ruby programming language without additional dependencies.
+An old version, not supporting array destructuring in block parameters.
+The script should import 'rb_xes' and 'rb_process_tree', and allow for the provision of two arguments:
+- the path to the input XES file.
+- the path to the output PTML file.
+
+
+<< Event logs importing >>
+In the following, you can deduce how XES event logs are managed.
+
+The module with relative path "rb_xes" contains the following code:
+
+class XESImporterExporter
+  attr_accessor :traces
+
+  def initialize
+    @traces = []
+  end
+
+  # Import XES file and populate @traces
+  def import(file_path)
+    current_trace = nil
+    inside_event = false
+
+    File.open(file_path, 'r') do |file|
+      file.each_line do |line|
+        line.strip!
+
+        if line.start_with?('<trace>')
+          current_trace = []
+        elsif line.start_with?('</trace>')
+          @traces << current_trace if current_trace
+          current_trace = nil
+        elsif line.start_with?('<event>')
+          inside_event = true
+        elsif line.start_with?('</event>')
+          inside_event = false
+        elsif inside_event && line.start_with?('<string ')
+          # Extract key and value
+          key = extract_attribute(line, 'key')
+          value = extract_attribute(line, 'value')
+          if key == 'concept:name'
+            current_trace << value if current_trace
+          end
+        end
+      end
+    end
+  end
+
+  # Export @traces to XES file
+  def export(file_path)
+    File.open(file_path, 'w') do |file|
+      # Write XML header
+      file.puts("<?xml version='1.0' encoding='UTF-8'?>")
+      # Start log tag
+      file.puts('<log>')
+
+      @traces.each do |trace|
+        # Start trace
+        file.puts('  <trace>')
+        trace.each do |activity|
+          # Start event
+          file.puts('    <event>')
+          # Write concept:name
+          file.puts("      <string key='concept:name' value='#{escape_xml(activity)}'/>")
+          # End event
+          file.puts('    </event>')
+        end
+        # End trace
+        file.puts('  </trace>')
+      end
+
+      # End log tag
+      file.puts('</log>')
+    end
+  end
+
+  private
+
+  # Helper method to extract attribute values from a tag
+  def extract_attribute(line, attr_name)
+    if match = line.match(/#{attr_name}='([^']*)'/)
+      match[1]
+    elsif match = line.match(/#{attr_name}="([^"]*)"/)
+      match[1]
+    else
+      nil
+    end
+  end
+
+  # Escape special XML characters
+  def escape_xml(text)
+    text.to_s.gsub('&', '&amp;').gsub('<', '&lt;').gsub('>', '&gt;')
+             .gsub('"', '&quot;').gsub("'", '&apos;')
+  end
+end
+
+# Main execution: handle command-line arguments
+if __FILE__ == $0
+  if ARGV.length != 2
+    puts "Usage: ruby #{__FILE__} input_file.xes output_file.xes"
+    exit 1
+  end
+
+  input_file = ARGV[0]
+  output_file = ARGV[1]
+
+  # Check if input file exists
+  unless File.exist?(input_file)
+    puts "Error: Input file '#{input_file}' does not exist."
+    exit 1
+  end
+
+  # Create an instance of the importer/exporter
+  importer_exporter = XESImporterExporter.new
+
+  # Perform import and export
+  begin
+    puts "Importing from '#{input_file}'..."
+    importer_exporter.import(input_file)
+    puts "Successfully imported #{importer_exporter.traces.size} traces."
+
+    puts "Exporting to '#{output_file}'..."
+    importer_exporter.export(output_file)
+    puts "Export completed."
+  rescue => e
+    puts "An error occurred: #{e.message}"
+    exit 1
+  end
+end
+
+
+
+<<Process tree data structure and export>>
+In the following, you can find how process trees are stored internally and can be exported to a PTML XML file.
+
+The module with relative path "rb_process_tree" contains the following code:
+
+#!/usr/bin/env ruby
+
+require 'rexml/document'
+include REXML
+
+# Class representing a node in the process tree
+class ProcessNode
+  attr_accessor :id, :name, :type, :children
+
+  def initialize(id, name, type)
+    @id = id              # Unique identifier of the node
+    @name = name          # Name of the node
+    @type = type          # Type of the node (e.g., 'and', 'sequence', 'manualTask')
+    @children = []        # Children of this node
+  end
+
+  # Add a child node
+  def add_child(child_node)
+    @children << child_node
+  end
+
+  # Remove a child node
+  def remove_child(child_node)
+    @children.delete(child_node)
+  end
+end
+
+# Class representing a parentsNode element (edge) in the process tree
+class ParentsNode
+  attr_accessor :id, :sourceId, :targetId
+
+  def initialize(id, sourceId, targetId)
+    @id = id              # Unique identifier of the parentsNode
+    @sourceId = sourceId  # ID of the parent node
+    @targetId = targetId  # ID of the child node
+  end
+end
+
+# Main script
+if ARGV.length != 2
+  puts "Usage: ruby process_tree.rb input.ptml output.ptml"
+  exit
+end
+
+input_file = ARGV[0]
+output_file = ARGV[1]
+
+# Parse the input PTML file
+file = File.open(input_file)
+doc = Document.new(file)
+file.close
+
+# Get the processTree element
+process_tree_elem = doc.get_elements('/ptml/processTree').first
+
+# Extract root ID and attributes
+root_id = process_tree_elem.attributes['root']
+process_tree_attributes = {}
+process_tree_elem.attributes.each do |attr_name, attr_value|
+  process_tree_attributes[attr_name] = attr_value
+end
+
+nodes = {}          # Hash to store nodes by their IDs
+parents_nodes = []  # Array to store parentsNode elements
+
+# Parse node elements and create ProcessNode instances
+process_tree_elem.elements.each do |element|
+  case element.name
+  when 'and', 'or', 'xor', 'sequence', 'xorLoop', 'loop', 'manualTask', 'automaticTask'
+    id = element.attributes['id']
+    name = element.attributes['name']
+    type = element.name
+    node = ProcessNode.new(id, name, type)
+    nodes[id] = node
+  end
+end
+
+# Parse parentsNode elements to build relationships
+process_tree_elem.elements.each('parentsNode') do |element|
+  id = element.attributes['id']
+  sourceId = element.attributes['sourceId']
+  targetId = element.attributes['targetId']
+
+  parents_node = ParentsNode.new(id, sourceId, targetId)
+  parents_nodes << parents_node
+
+  # Establish parent-child relationship
+  parent_node = nodes[sourceId]
+  child_node = nodes[targetId]
+
+  if parent_node && child_node
+    parent_node.add_child(child_node)
+  else
+    puts "Warning: Could not find parent node #{sourceId} or child node #{targetId}."
+  end
+end
+
+# Now the process tree data structure is built
+# You can manipulate the tree here if needed (e.g., insert or remove nodes)
+
+# Export the process tree back to PTML format
+output_doc = Document.new
+output_doc << XMLDecl.new('1.0', 'UTF-8')
+
+# Create root ptml element
+ptml_elem = output_doc.add_element('ptml')
+
+# Create processTree element with attributes
+process_tree_elem_out = ptml_elem.add_element('processTree')
+process_tree_attributes.each do |attr_name, attr_value|
+  process_tree_elem_out.add_attribute(attr_name, attr_value)
+end
+
+# Add node elements to the processTree
+nodes.values.each do |node|
+  node_elem = process_tree_elem_out.add_element(node.type)
+  node_elem.add_attribute('id', node.id)
+  node_elem.add_attribute('name', node.name || '')
+end
+
+# Add parentsNode elements to define the relationships
+parents_nodes.each do |pn|
+  pn_elem = process_tree_elem_out.add_element('parentsNode')
+  pn_elem.add_attribute('id', pn.id)
+  pn_elem.add_attribute('sourceId', pn.sourceId)
+  pn_elem.add_attribute('targetId', pn.targetId)
+end
+
+# Write the output document to the output file
+File.open(output_file, 'w') do |file|
+  formatter = REXML::Formatters::Pretty.new(2) # Indent by 2 spaces
+  formatter.compact = true                     # Remove unnecessary whitespace
+  formatter.write(output_doc, file)
+end
+
+puts "Process tree has been exported to #{output_file}."
