@@ -1,0 +1,294 @@
+I ask you to implement importers/exporters for the Object-Centric Event Log (OCEL) 2.0 standard in process mining.
+Implement that in a single file in the Ruby scripting language without dependencies in an efficient way.
+Make the program accept an input argument (the input file) and an output argument (the output file)
+
+There are two variants, here we focus on the XML one.
+
+
+** XML format **
+
+We propose an XML implementation following Definition~\ref{def:ocelDef}. The timestamps are assumed to follow the ISO format specification \url{https://en.wikipedia.org/wiki/ISO_8601}.
+
+The XML schema is organized as follows. There is a root element with the tag {\bf log}. The log element has the following children:
+\begin{itemize}
+\item An element with tag {\bf object-types}, containing as many {\bf object-type} elements as types in $OT(L)$. Each {\bf object-type} has a {\bf name} property (which is the object type) and a single child with tag {\bf attributes}:
+\begin{itemize}
+    \item For every attribute in $\textrm{oatype}(ot)$, the element {\bf attributes} has a child with tag {\bf attribute} and properties {\bf name} (which is the attribute) and {\bf type} (the type of the attribute, which should be considered during the parsing of the values).
+\end{itemize}
+\item An element with tag {\bf event-types}, containing as many {\bf event-type} elements as types in $OT(L)$. Each {\bf event-type} has a {\bf name} property (which is the event type) and a single child with tag {\bf attributes}:
+\begin{itemize}
+    \item For every attribute in $\textrm{eatype}(et)$, the element {\bf attributes} has a child with tag {\bf attribute} and properties {\bf name} (which is the attribute) and {\bf type} (the type of the attribute, which should be considered during the parsing of the values).
+\end{itemize}
+\item An element with tag {\bf events}, containing as many {\bf event} elements as many events are in $E$. An {\bf event} is characterized by:
+\begin{itemize}
+\item Its properties {\bf id} (the identifier of the event), {\bf type} (the event type of the event, given by \textrm{evtype} in Definition~\ref{def:ocelDef}) and {\bf time} (the timestamp of the event, given by \textrm{time} in Definition~\ref{def:ocelDef}).
+\item A child with tag {\bf objects}, containing the related objects to the event (\textrm{E2O} in Definition~\ref{def:ocelDef}; we define the function:
+$$\textrm{relobj}(e) = \{ (o, q) ~ \arrowvert ~ (e', q, o) \in \textrm{E2O} ~ \wedge ~ e' = e \}$$
+which associates to every event a set of objects along with the qualifier of the relationship). In particular,
+for every event-to-object relationship an entry {\bf relobj} is created, having as properties the {\bf object-id} (related object identifier) and {\bf qualifier} (the qualifier of the event-to-object relationship).
+\item A child with tag {\bf attributes}, having as many children {\bf attribute} as many attributes are related to the event (the domain of $\textrm{eaval}_{ea}$ in Definition~\ref{def:ocelDef}):
+\begin{itemize}
+\item Each {\bf attribute} is characterized by a {\bf name} property and the corresponding value is reported as text of the (XML) element.
+\end{itemize}
+\end{itemize}
+\item An element with tag {\bf objects}, containing as many {\bf object} elements as many objects are in $O$. An {\bf object} is characterized by:
+\begin{itemize}
+    \item Its properties {\bf id} (the identifier of the object) and {\bf type} (the object type of the object, given by \textrm{objtype} in Definition~\ref{def:ocelDef}).
+    \item An element with tag {\bf attributes}, containing the different {\bf attribute} of the object.
+    \item Each {\bf attribute} is characterized by a {\bf time} property (the timestamp in which the value for the given attribute was recorded), a {\bf name} property, and the corresponding value is reported as the text of the (XML) element. An attribute is valid from the specified {\bf time} (until an attribute with the same name and greater timestamp is recorded).
+    \item A child with tag {\bf objects}, containing the related objects to the given object (\textrm{O2O} in Definition~\ref{def:ocelDef}; we define the function:
+    $$\textrm{relobj}(o) = \{ (o'', q) ~ \arrowvert ~ (o', q, o'') \in \textrm{O2O} ~ \wedge ~ o' = o \}$$
+    which associates to every object a set of objects along with the qualifier of the relationship). In particular,
+    for every object-to-object relationship an entry {\bf relobj} is created, having as properties the {\bf object-id} (related object identifier) and {\bf qualifier} (the qualifier of the object-to-object relationship).
+\end{itemize}
+\end{itemize}
+
+In the remainder of this section, we show an example file and the XSD (XML Schema Definition) that can be used to check consistency.
+
+
+<?xml version='1.0' encoding='UTF-8'?>
+<log>
+  <object-types>
+    <object-type name="Invoice">
+      <attributes>
+        <attribute name="is_blocked" type="string"/>
+      </attributes>
+    </object-type>
+    <object-type name="Payment">
+      <attributes/>
+    </object-type>
+    <object-type name="Purchase Order">
+      <attributes>
+        <attribute name="po_product" type="string"/>
+        <attribute name="po_quantity" type="string"/>
+      </attributes>
+    </object-type>
+    <object-type name="Purchase Requisition">
+      <attributes>
+        <attribute name="pr_product" type="string"/>
+        <attribute name="pr_quantity" type="string"/>
+      </attributes>
+    </object-type>
+  </object-types>
+  <event-types>
+    <event-type name="Approve Purchase Requisition">
+      <attributes>
+        <attribute name="pr_approver" type="string"/>
+      </attributes>
+    </event-type>
+    <event-type name="Change PO Quantity">
+      <attributes>
+        <attribute name="po_editor" type="string"/>
+      </attributes>
+    </event-type>
+    <event-type name="Create Purchase Order">
+      <attributes>
+        <attribute name="po_creator" type="string"/>
+      </attributes>
+    </event-type>
+    <event-type name="Create Purchase Requisition">
+      <attributes>
+        <attribute name="pr_creator" type="string"/>
+      </attributes>
+    </event-type>
+    <event-type name="Insert Invoice">
+      <attributes>
+        <attribute name="invoice_inserter" type="string"/>
+      </attributes>
+    </event-type>
+    <event-type name="Insert Payment">
+      <attributes>
+        <attribute name="payment_inserter" type="string"/>
+      </attributes>
+    </event-type>
+    <event-type name="Remove Payment Block">
+      <attributes>
+        <attribute name="invoice_block_rem" type="string"/>
+      </attributes>
+    </event-type>
+    <event-type name="Set Payment Block">
+      <attributes>
+        <attribute name="invoice_blocker" type="string"/>
+      </attributes>
+    </event-type>
+  </event-types>
+  <objects>
+    <object id="R1" type="Invoice">
+      <attributes>
+        <attribute name="is_blocked" time="1970-01-01T00:00:00Z">No</attribute>
+      </attributes>
+      <objects>
+        <relationship object-id="P1" qualifier="Payment from invoice"/>
+      </objects>
+    </object>
+    <object id="R2" type="Invoice">
+      <attributes>
+        <attribute name="is_blocked" time="1970-01-01T00:00:00Z">No</attribute>
+      </attributes>
+      <objects>
+        <relationship object-id="P2" qualifier="Payment from invoice"/>
+      </objects>
+    </object>
+    <object id="R3" type="Invoice">
+      <attributes>
+        <attribute name="is_blocked" time="1970-01-01T00:00:00Z">No</attribute>
+        <attribute name="is_blocked" time="2022-02-03T07:30:00Z">Yes</attribute>
+        <attribute name="is_blocked" time="2022-02-03T23:30:00Z">No</attribute>
+      </attributes>
+      <objects>
+        <relationship object-id="P3" qualifier="Payment from invoice"/>
+      </objects>
+    </object>
+    <object id="P1" type="Payment">
+      <attributes/>
+    </object>
+    <object id="P2" type="Payment">
+      <attributes/>
+    </object>
+    <object id="P3" type="Payment">
+      <attributes/>
+    </object>
+    <object id="PO1" type="Purchase Order">
+      <attributes>
+        <attribute name="po_product" time="1970-01-01T00:00:00Z">Cows</attribute>
+        <attribute name="po_quantity" time="1970-01-01T00:00:00Z">500</attribute>
+        <attribute name="po_quantity" time="2022-01-13T12:00:00Z">600</attribute>
+      </attributes>
+      <objects>
+        <relationship object-id="R1" qualifier="Invoice from PO"/>
+        <relationship object-id="R2" qualifier="Invoice from PO"/>
+      </objects>
+    </object>
+    <object id="PO2" type="Purchase Order">
+      <attributes>
+        <attribute name="po_product" time="1970-01-01T00:00:00Z">Notebooks</attribute>
+        <attribute name="po_quantity" time="1970-01-01T00:00:00Z">1</attribute>
+      </attributes>
+      <objects>
+        <relationship object-id="R3" qualifier="Maverick buying"/>
+      </objects>
+    </object>
+    <object id="PR1" type="Purchase Requisition">
+      <attributes>
+        <attribute name="pr_product" time="1970-01-01T00:00:00Z">Cows</attribute>
+        <attribute name="pr_quantity" time="1970-01-01T00:00:00Z">500</attribute>
+      </attributes>
+      <objects>
+        <relationship object-id="PO1" qualifier="PO from PR"/>
+      </objects>
+    </object>
+  </objects>
+  <events>
+    <event id="e1" type="Create Purchase Requisition" time="2022-01-09T15:00:00Z">
+      <attributes>
+        <attribute name="pr_creator">Mike</attribute>
+      </attributes>
+      <objects>
+        <relationship object-id="PR1" qualifier="Regular placement of PR"/>
+      </objects>
+    </event>
+    <event id="e2" type="Approve Purchase Requisition" time="2022-01-09T16:30:00Z">
+      <attributes>
+        <attribute name="pr_approver">Tania</attribute>
+      </attributes>
+      <objects>
+        <relationship object-id="PR1" qualifier="Regular approval of PR"/>
+      </objects>
+    </event>
+    <event id="e3" type="Create Purchase Order" time="2022-01-10T09:15:00Z">
+      <attributes>
+        <attribute name="po_creator">Mike</attribute>
+      </attributes>
+      <objects>
+        <relationship object-id="PR1" qualifier="Created order from PR"/>
+        <relationship object-id="PO1" qualifier="Created order with identifier"/>
+      </objects>
+    </event>
+    <event id="e4" type="Change PO Quantity" time="2022-01-13T12:00:00Z">
+      <attributes>
+        <attribute name="po_editor">Mike</attribute>
+      </attributes>
+      <objects>
+        <relationship object-id="PO1" qualifier="Change of quantity"/>
+      </objects>
+    </event>
+    <event id="e5" type="Insert Invoice" time="2022-01-14T12:00:00Z">
+      <attributes>
+        <attribute name="invoice_inserter">Luke</attribute>
+      </attributes>
+      <objects>
+        <relationship object-id="PO1" qualifier="Invoice created starting from the PO"/>
+        <relationship object-id="R1" qualifier="Invoice created with identifier"/>
+      </objects>
+    </event>
+    <event id="e6" type="Insert Invoice" time="2022-01-16T11:00:00Z">
+      <attributes>
+        <attribute name="invoice_inserter">Luke</attribute>
+      </attributes>
+      <objects>
+        <relationship object-id="PO1" qualifier="Invoice created starting from the PO"/>
+        <relationship object-id="R2" qualifier="Invoice created with identifier"/>
+      </objects>
+    </event>
+    <event id="e7" type="Insert Payment" time="2022-01-30T23:00:00Z">
+      <attributes>
+        <attribute name="payment_inserter">Robot</attribute>
+      </attributes>
+      <objects>
+        <relationship object-id="R1" qualifier="Payment for the invoice"/>
+        <relationship object-id="P1" qualifier="Payment inserted with identifier"/>
+      </objects>
+    </event>
+    <event id="e8" type="Insert Payment" time="2022-01-31T22:00:00Z">
+      <attributes>
+        <attribute name="payment_inserter">Robot</attribute>
+      </attributes>
+      <objects>
+        <relationship object-id="R2" qualifier="Payment for the invoice"/>
+        <relationship object-id="P2" qualifier="Payment created with identifier"/>
+      </objects>
+    </event>
+    <event id="e9" type="Insert Invoice" time="2022-02-02T09:00:00Z">
+      <attributes>
+        <attribute name="invoice_inserter">Mario</attribute>
+      </attributes>
+      <objects>
+        <relationship object-id="R3" qualifier="Invoice created with identifier"/>
+      </objects>
+    </event>
+    <event id="e10" type="Create Purchase Order" time="2022-02-02T17:00:00Z">
+      <attributes>
+        <attribute name="po_creator">Mario</attribute>
+      </attributes>
+      <objects>
+        <relationship object-id="R3" qualifier="Purchase order created with maverick buying from"/>
+        <relationship object-id="PO2" qualifier="Purchase order created with identifier"/>
+      </objects>
+    </event>
+    <event id="e11" type="Set Payment Block" time="2022-02-03T07:30:00Z">
+      <attributes>
+        <attribute name="invoice_blocker">Mario</attribute>
+      </attributes>
+      <objects>
+        <relationship object-id="R3" qualifier="Payment block due to unethical maverick buying"/>
+      </objects>
+    </event>
+    <event id="e12" type="Remove Payment Block" time="2022-02-03T23:30:00Z">
+      <attributes>
+        <attribute name="invoice_block_rem">Mario</attribute>
+      </attributes>
+      <objects>
+        <relationship object-id="R3" qualifier="Payment block removed ..."/>
+      </objects>
+    </event>
+    <event id="e13" type="Insert Payment" time="2022-02-28T23:00:00Z">
+      <attributes>
+        <attribute name="payment_inserter">Robot</attribute>
+      </attributes>
+      <objects>
+        <relationship object-id="R3" qualifier="Payment for the invoice"/>
+        <relationship object-id="P3" qualifier="Payment inserted with identifier"/>
+      </objects>
+    </event>
+  </events>
+</log>
